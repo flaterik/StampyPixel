@@ -20,7 +20,7 @@ Adafruit_NeoPixel strip2 = Adafruit_NeoPixel(PIX2, PIN2, NEO_GRB + NEO_KHZ800);
 int read1Max = 1017;
 int read1Min = 19;
 
-unsigned long loopInterval = 1000;
+unsigned long loopInterval = 10000;
 unsigned long loopCount = 0;
 
 unsigned long lastChangeMillis = 0;
@@ -32,8 +32,8 @@ int displaySize = 3;
 uint32_t bgColor1 = strip.Color(1,1,1);
 uint32_t bgColor2 = strip2.Color(1,1,1);
 
-int bgBrightnessFloor = 5;
-int bgBrightnessCeiling = 55;
+int bgBrightnessFloor = 0;
+int bgBrightnessCeiling = 255;
 
 float fmap(float x, float in_min, float in_max, float out_min, float out_max)
 {
@@ -123,6 +123,7 @@ int getInputIndex2() {
 
 void loop() {
   loopCount++;
+  if(loopCount > loopInterval) loopCount = 0; //this should be taken care of by the loop color function but there were some occasional weird jumps. there's no way a long was rolling over, but this seems to fix it. 
   int now = millis();
   bgColor1 = getBgColor();
  // bgColor2 = getBgColor(now);
