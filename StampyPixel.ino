@@ -1,7 +1,10 @@
 #include <Adafruit_NeoPixel.h>
 
-#define PIN 6
-#define PIX 37
+#define PIN1 11
+#define PIN2 10
+
+#define PIX1 75
+#define PIX2 38
 // Parameter 1 = number of pixels in strip
 // Parameter 2 = pin number (most are valid)
 // Parameter 3 = pixel type flags, add together as needed:
@@ -9,126 +12,153 @@
 //   NEO_GRB     Pixels are wired for GRB bitstream
 //   NEO_KHZ400  400 KHz bitstream (e.g. FLORA pixels)
 //   NEO_KHZ800  800 KHz bitstream (e.g. High Density LED strip)
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIX, PIN, NEO_GRB + NEO_KHZ400);
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIX1, PIN1, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip2 = Adafruit_NeoPixel(PIX2, PIN2, NEO_GRB + NEO_KHZ800);
+
+int read1Max = 1017;
+int read1Min = 19;
+
 unsigned long INTERVAL = 10000;
+float fInterval = 10000.0;
+
 unsigned long lastChangeMillis = 0;
 unsigned long millisSinceChange = 0;
 int lastInput = 0;
 int displaySize = 3;
-uint32_t bgColor = strip.Color(1,1,1);
+uint32_t bgColor1 = strip.Color(1,1,1);
+uint32_t bgColor2 = strip2.Color(1,1,1);
 
-int led1min = 0;             
-int led1max = 20;
-int led2min = 0;
-int led2max = 20;
-int led3min = 0;
-int led3max = 20;
-//
+int bgBrightnessFloor = 5;
+int bgBrightnessCeiling = 45;
+
 float fmap(float x, float in_min, float in_max, float out_min, float out_max)
 {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
-//
-int getValue(long time)
-{
-  long index = time % INTERVAL;
-  float maxVal = (float)INTERVAL; 
-  float j = (float)index;
-  float rads = fmap(j, 0.0, maxVal, 0.0, 3.14159);
-  int nextValue = (int)fmap(sin(rads), 0, 1, led1min, led1max); 
-  return nextValue;
-}
-////
-int getValue2(long time)
-{
-  long index = (time + (INTERVAL/3)) % INTERVAL;
-  float maxVal = (float)INTERVAL; 
-  float j = (float)index;
-  float rads = fmap(j, 0.0, maxVal, 0.0, 3.14159);
-  int nextValue = (int)fmap(sin(rads), 0, 1, led2min, led2max); 
-  return nextValue;
+
+float getRadians(float index) {
+  Serial.print("getting radians for: ");
+  Serial.println(index);
+  return fmap(index, 0.0, fInterval, 0.0, 3.14159);
 }
 
-int getValue3(long time)
-{
-  long index = (time + (2 * (INTERVAL/3))) % INTERVAL;
-  float maxVal = (float)INTERVAL; 
-  float j = (float)index;
-  float rads = fmap(j, 0.0, maxVal, 0.0, 3.14159);
-  int nextValue = (int)fmap(sin(rads), 0, 1, led3min, led3max); 
-  return nextValue;
+int sinMap(float rads) {
+   return (int)fmap(sin(rads), 0, 1, bgBrightnessFloor, bgBrightnessCeiling);
 }
 
-void showIndex(int index, uint32_t color) {
-  for(uint16_t i=0; i < PIX; i++) {
-    strip.setPixelColor(i, bgColor);
+uint32_t getBgColor(long time)
+{
+  float rIndex = (float)(time % INTERVAL);
+  float gIndex = (float)((time + (INTERVAL/3)) % INTERVAL);
+  float bIndex = (float)((time + (2 * (INTERVAL/3))) % INTERVAL);
+
+  float rRads = getRadians(rIndex);
+  float gRads = getRadians(gIndex);
+  float bRads = getRadians(gIndex);
+    
+  int r = sinMap(rRads);
+  int g = sinMap(gRads);
+  int b = sinMap(bRads);
+    
+  return strip.Color(r,g,b);
+}
+
+void showIndex1(int index, uint32_t color) {
+  for(uint16_t i=0; i < PIX1; i++) {
+    strip.setPixelColor(i, bgColor1);
+  }
+//  for(int j=index; j < index + displaySize; j++) {
+//    if(j < PIX1)
+//      strip.setPixelColor(j, color);
+//  }
+  strip.show();
+}
+
+void showIndex2(int index, uint32_t color) {
+  for(uint16_t i=0; i < PIX2; i++) {
+    strip2.setPixelColor(i, bgColor2);
   }
   for(int j=index; j < index + displaySize; j++) {
-    if(j < PIX)
-      strip.setPixelColor(j, color);
+    if(j < PIX2)
+      strip2.setPixelColor(j, color);
   }
-  strip.show();
+  strip2.show();
 }
 
 void setup() {
   Serial.begin(9600);
   strip.begin();
-  lastInput = getInputIndex();
+  strip2.begin();
+  //lastInput = getInputIndex1();
   lastChangeMillis = millis();
   strip.show(); // Initialize all pixels to 'off'
+  //strip2.show();
+  colorWipe(strip.Color(255, 0, 0), 50); // Red
+  colorWipeBack(strip.Color(0, 255, 0), 50); // Green
+  colorWipe(strip.Color(0, 0, 255), 50); // Blue
+  int now = millis();
+  bgColor1 = getBgColor(now);
+  colorWipeBack(bgColor1, 50);
 }
 
 
-int getInputIndex() {
+int getInputIndex1() {
   int input1 = analogRead(A0);
-  return map(input1, 0, 1023, 0, PIX - 1); 
+  //Serial.println(input1);
+  return map(input1, read1Min, read1Max, 0, PIX1 - 1); 
+}
+
+int getInputIndex2() {
+  int input2 = analogRead(A1);
+  return map(input2, 0, 1023, 0, PIX2 - 1); 
 }
 
 void loop() {
   int now = millis();
- // getValue(now);
-  //bgColor = strip.Color(getValue(now),getValue2(now),getValue3(now));
-  bgColor = strip.Color(getValue(now),0,0);
-  //bgColor = Wheel(map(now % INTERVAL, 0, INTERVAL, 0, 255), 5
-  int inputIndex = getInputIndex();
+  
+  bgColor1 = getBgColor(now);
+  bgColor2 = getBgColor(now);
+  
+  int inputIndex1 = getInputIndex1();
+  int inputIndex2 = getInputIndex2();
+
   millisSinceChange = now - lastChangeMillis;
   
-  if(inputIndex != lastInput) {
+  if(inputIndex1 != lastInput) {
     lastChangeMillis = now;
-    lastInput = inputIndex;
+    lastInput = inputIndex1;
   }
   
-
- // Serial.println(millisSinceChange);
   int maxval = 25;
   int constrainedMillis = constrain(millisSinceChange, 0, maxval);
-  int dimness = map(constrainedMillis, 0, maxval, 0, 125);
+  int dimness = map(constrainedMillis, 0, maxval, 0, 255);
   //Serial.println(dimness);
-  int brightness = 125 - dimness;
+  int brightness = 255 - dimness;
   
   int red = brightness;
   int blue = dimness / 2;
   int green = dimness / 2;
-  showIndex(inputIndex, strip.Color(red, green, blue));
+  showIndex1(0, strip.Color(red, green, blue));
+  showIndex2(inputIndex2, strip2.Color(red, green, blue));
   delay(1);
 }
 
 //// Fill the dots one after the other with a color
-//void colorWipe(uint32_t c, uint8_t wait) {
-//  for(uint16_t i=0; i<strip.numPixels(); i++) {
-//      strip.setPixelColor(i, c);
-//      strip.show();
-//      delay(wait);
-//  }
-//}
+void colorWipe(uint32_t c, uint8_t wait) {
+  for(uint16_t i=0; i<strip.numPixels(); i++) {
+      strip.setPixelColor(i, c);
+      strip.show();
+      delay(wait);
+  }
+}
 //
-//void colorWipeBack(uint32_t c, uint8_t wait) {
-//  for(uint16_t i=0; i<=strip.numPixels(); i++) {
-//      strip.setPixelColor(strip.numPixels() - i, c);
-//      strip.show();
-//      delay(wait);
-//  }
-//}
+void colorWipeBack(uint32_t c, uint8_t wait) {
+  for(uint16_t i=0; i<=strip.numPixels(); i++) {
+      strip.setPixelColor(strip.numPixels() - i, c);
+      strip.show();
+      delay(wait);
+  }
+}
 //
 //void rainbow(uint8_t wait) {
 //  uint16_t i, j;
