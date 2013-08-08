@@ -4,6 +4,8 @@
 #define PIN2 10
 
 #define PIX1 75
+#define CENTER1 37
+
 #define PIX2 38
 // Parameter 1 = number of pixels in strip
 // Parameter 2 = pin number (most are valid)
@@ -18,48 +20,52 @@ Adafruit_NeoPixel strip2 = Adafruit_NeoPixel(PIX2, PIN2, NEO_GRB + NEO_KHZ800);
 int read1Max = 1017;
 int read1Min = 19;
 
-unsigned long INTERVAL = 10000;
-float fInterval = 10000.0;
+unsigned long loopInterval = 1000;
+unsigned long loopCount = 0;
 
 unsigned long lastChangeMillis = 0;
 unsigned long millisSinceChange = 0;
+
 int lastInput = 0;
 int displaySize = 3;
+
 uint32_t bgColor1 = strip.Color(1,1,1);
 uint32_t bgColor2 = strip2.Color(1,1,1);
 
 int bgBrightnessFloor = 5;
-int bgBrightnessCeiling = 45;
+int bgBrightnessCeiling = 55;
 
 float fmap(float x, float in_min, float in_max, float out_min, float out_max)
 {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-float getRadians(float index) {
-  Serial.print("getting radians for: ");
-  Serial.println(index);
-  return fmap(index, 0.0, fInterval, 0.0, 3.14159);
+float getRadians(float index, int interval) {
+  return fmap(index, 0.0, interval, 0.0, 6.28);
 }
 
 int sinMap(float rads) {
-   return (int)fmap(sin(rads), 0, 1, bgBrightnessFloor, bgBrightnessCeiling);
+   return (int)fmap(sin(rads), -1, 1, bgBrightnessFloor, bgBrightnessCeiling);
 }
 
-uint32_t getBgColor(long time)
-{
-  float rIndex = (float)(time % INTERVAL);
-  float gIndex = (float)((time + (INTERVAL/3)) % INTERVAL);
-  float bIndex = (float)((time + (2 * (INTERVAL/3))) % INTERVAL);
+uint32_t getBgColor() {
+  return getLoopedColor(loopCount, loopInterval);
+}
 
-  float rRads = getRadians(rIndex);
-  float gRads = getRadians(gIndex);
-  float bRads = getRadians(gIndex);
+uint32_t getLoopedColor(int index, int interval)
+{
+  float rIndex = (float)(index % interval);
+  float gIndex = (float)((index + (interval/3)) % interval);
+  float bIndex = (float)((index + (2 * (interval/3))) % interval);
+
+  float rRads = getRadians(rIndex, interval);
+  float gRads = getRadians(gIndex, interval);
+  float bRads = getRadians(bIndex, interval);
     
   int r = sinMap(rRads);
   int g = sinMap(gRads);
   int b = sinMap(bRads);
-    
+
   return strip.Color(r,g,b);
 }
 
@@ -88,19 +94,21 @@ void showIndex2(int index, uint32_t color) {
 void setup() {
   Serial.begin(9600);
   strip.begin();
-  strip2.begin();
+  //strip2.begin();
   //lastInput = getInputIndex1();
   lastChangeMillis = millis();
   strip.show(); // Initialize all pixels to 'off'
   //strip2.show();
-  colorWipe(strip.Color(255, 0, 0), 50); // Red
-  colorWipeBack(strip.Color(0, 255, 0), 50); // Green
-  colorWipe(strip.Color(0, 0, 255), 50); // Blue
-  int now = millis();
-  bgColor1 = getBgColor(now);
-  colorWipeBack(bgColor1, 50);
+  
+  rainbowWipeUp(50);
+  delay(250);
+  colorWipeDown(strip.Color(0,0,0), 50);
+  delay(250);
+  bgColor1 = getBgColor();
+  delay(250);
+  colorWipeUp(bgColor1, 50);
+  
 }
-
 
 int getInputIndex1() {
   int input1 = analogRead(A0);
@@ -114,10 +122,10 @@ int getInputIndex2() {
 }
 
 void loop() {
+  loopCount++;
   int now = millis();
-  
-  bgColor1 = getBgColor(now);
-  bgColor2 = getBgColor(now);
+  bgColor1 = getBgColor();
+ // bgColor2 = getBgColor(now);
   
   int inputIndex1 = getInputIndex1();
   int inputIndex2 = getInputIndex2();
@@ -143,60 +151,45 @@ void loop() {
   delay(1);
 }
 
-//// Fill the dots one after the other with a color
-void colorWipe(uint32_t c, uint8_t wait) {
-  for(uint16_t i=0; i<strip.numPixels(); i++) {
-      strip.setPixelColor(i, c);
-      strip.show();
-      delay(wait);
+void colorWipeDown(uint32_t c, uint8_t wait) {
+  int8_t i, j;
+  for(i = CENTER1, j = CENTER1 + 1; i >= 0; i--, j++) {
+    Serial.println(i);
+    Serial.println(j);
+    strip.setPixelColor(i, c);
+    if(j < PIX1) strip.setPixelColor(j, c);
+    strip.show();
+    delay(wait);
   }
 }
-//
-void colorWipeBack(uint32_t c, uint8_t wait) {
-  for(uint16_t i=0; i<=strip.numPixels(); i++) {
-      strip.setPixelColor(strip.numPixels() - i, c);
-      strip.show();
-      delay(wait);
-  }
-}
-//
-//void rainbow(uint8_t wait) {
-//  uint16_t i, j;
-//
-//  for(j=0; j<256; j++) {
-//    for(i=0; i<strip.numPixels(); i++) {
-//      strip.setPixelColor(i, Wheel((i+j) & 255));
-//    }
-//    strip.show();
-//    delay(wait);
-//  }
-//}
-//
-//// Slightly different, this makes the rainbow equally distributed throughout
-//void rainbowCycle(uint8_t wait) {
-//  uint16_t i, j;
-//
-//  for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
-//    for(i=0; i< strip.numPixels(); i++) {
-//      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
-//    }
-//    strip.show();
-//    delay(wait);
-//  }
-//}
-//
-//// Input a value 0 to 255 to get a color value.
-//// The colours are a transition r - g - b - back to r.
 
-//uint32_t Wheel(byte WheelPos, int maxVal) {
-//  if(WheelPos < 85) {
-//   return strip.Color(map(WheelPos * 3, 0, 255, 0, maxVal), map(255 - WheelPos * 3, 0, 255, 0, maxVal), 0);
-//  } else if(WheelPos < 170) {
-//   WheelPos -= 85;
-//   return strip.Color(map(255 - WheelPos * 3, 0, 255, 0, maxVal), 0, map(WheelPos * 3, 0, 255, 0, maxVal));
-//  } else {
-//   WheelPos -= 170;
-//   return strip.Color(0, map(WheelPos * 3, 0, 255, 0, maxVal), map(255 - WheelPos * 3, 0, 255, 0, maxVal));
-//  }
-//}
+void colorWipeUp(uint32_t c, uint8_t wait) {
+  int8_t i, j;
+  for(i = 0, j = PIX1 - 1; i < CENTER1 ; i++, j--) {
+    strip.setPixelColor(i, c);
+    strip.setPixelColor(j, c);
+    strip.show();
+    delay(wait);
+  }
+}
+
+void rainbowWipeDown(uint8_t wait) {
+  int8_t i, j;
+  for(i = CENTER1, j = CENTER1 + 1; i >= 0; i--, j++) {
+    strip.setPixelColor(i, getLoopedColor(i, PIX1));
+    if(j < PIX1) strip.setPixelColor(j, getLoopedColor(j, PIX1));
+    strip.show();
+    delay(wait);
+  }
+}
+
+void rainbowWipeUp(uint8_t wait) {
+  int8_t i, j;
+  for(i = 0, j = PIX1 - 1; i < CENTER1 ; i++, j--) {
+    strip.setPixelColor(i, getLoopedColor(i, PIX1));
+    strip.setPixelColor(j, getLoopedColor(j, PIX1));
+    strip.show();
+    delay(wait);
+  }
+}
 
