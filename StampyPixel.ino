@@ -7,13 +7,7 @@
 #define CENTER1 37
 
 #define PIX2 38
-// Parameter 1 = number of pixels in strip
-// Parameter 2 = pin number (most are valid)
-// Parameter 3 = pixel type flags, add together as needed:
-//   NEO_RGB     Pixels are wired for RGB bitstream
-//   NEO_GRB     Pixels are wired for GRB bitstream
-//   NEO_KHZ400  400 KHz bitstream (e.g. FLORA pixels)
-//   NEO_KHZ800  800 KHz bitstream (e.g. High Density LED strip)
+
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIX1, PIN1, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel strip2 = Adafruit_NeoPixel(PIX2, PIN2, NEO_GRB + NEO_KHZ800);
 
@@ -24,9 +18,10 @@ unsigned long loopInterval = 10000;
 unsigned long loopCount = 0;
 
 unsigned long lastPosition = 0;
-unsigned long lastPositionMillis = 0;
 
-int lastInput = 0;
+int16_t lastIndex1 = 0;
+int16_t maxSpeed = 0;
+
 int displaySize = 4;
 
 uint32_t bgColor1 = strip.Color(1,1,1);
@@ -168,32 +163,18 @@ void loop() {
       if(averaged > read1Max) {
         read1Max = averaged;
       }
-    Serial.println(map(averaged, read1Min, read1Max, 0, PIX1 - 1));
-    //Serial.println(sampleSum / sampleBufferSize);
+    int16_t currentIndex1 = (uint16_t) map(averaged, read1Min, read1Max, 0, PIX1 - 1);
+    int16_t currentSpeed = abs(currentIndex1 - lastIndex1);
+    lastIndex1 = currentIndex1;
+    Serial.println(currentSpeed);
+    if(currentSpeed > maxSpeed) {
+      maxSpeed = currentSpeed;
+      Serial.print("New max speed!"); Serial.println(maxSpeed);
+    }
     sampleIndex = 0;
   }
   sampleBuffer[sampleIndex++] = inputPosition1;
-  
- // int inputIndex1 = getInputIndex1();
-  //int inputIndex2 = getInputIndex2();
-
-//  if(loopCount % 3 == 0) {
-//    int time1 = (int) now - lastPositionMillis;
-//    //Serial.println(time1);
-//    int distance1 = abs(lastPosition - inputPosition1);
-//    lastPosition = inputPosition1;
-//    if(distance1 <= 15) {
-//      distance1 = 0;
-//    }
-//    if(distance1 != 0) Serial.println(distance1);
-//    float velocity = abs((float)distance1 / (float)time1);
-    lastPositionMillis = now;
-//  }
-//  
-  //if(velocity != 0) Serial.println(velocity);
-  
-  
-  
+    
   int red = 125;
   int blue = 125;
   int green = 125;
